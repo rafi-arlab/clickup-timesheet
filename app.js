@@ -29,6 +29,27 @@ const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', min
 // mirrors what ClickUp's include_closed=false used to filter out for us
 const isClosed = t => !!(t.status && t.status.type === 'closed');
 
+// Request body for creating/updating a time entry.
+// ClickUp's create endpoint names the stop time `stop`, update names it `end` —
+// send both, or a create lands with no stop time and shows up as a running timer.
+// `billable` must be explicit: the API does not inherit the Space's default, and
+// omitting it on an update would clear a flag the entry already had.
+function entryBody(e) {
+  const b = {
+    tid: e.tid,
+    description: e.desc || '',
+    start: e.start,
+    duration: e.dur,
+    stop: e.start + e.dur,
+    end: e.start + e.dur,
+    billable: !!e.billable
+  };
+  // only on updates, and only when there are tags to preserve — a bare
+  // tag_action with no tags would wipe them
+  if (e.id && e.tags && e.tags.length) { b.tags = e.tags; b.tag_action = 'replace'; }
+  return b;
+}
+
 // side-by-side placement for overlapping blocks
 function layout(list) {
   const sorted = [...list].sort((a, b) => a.start - b.start || a.dur - b.dur);
@@ -286,23 +307,30 @@ function render() {
   cols.forEach((list, col) => {
     for (const { item, lane, lanes } of layout(list)) {
       const el = document.createElement('div');
-      el.className = 'block' + (item.dirty || !item.id ? ' dirty' : '');
+      el.className = 'block' + (item.dirty || !item.id ? ' dirty' : '') + (item.billable ? '' : ' nb');
       el.style.top = clamp((item.start - dayAt(col)) / MIN * PXM, 0, 24 * 60 * PXM) + 'px';
       el.style.height = Math.max(item.dur / MIN * PXM, 14) + 'px';
       el.style.left = 'calc(' + ((col + lane / lanes) * colPct) + '% + 2px)';
       el.style.width = 'calc(' + (colPct / lanes) + '% - 4px)';
-      el.innerHTML = '<b></b><span></span><div class="x">×</div><div class="grip"></div>';
+      el.innerHTML = '<b></b><span></span><div class="bill" title="Billable">$</div>' +
+        '<div class="x">×</div><div class="grip"></div>';
       el.querySelector('b').textContent = item.name;
       el.querySelector('span').textContent =
         fmtTime(item.start) + '–' + fmtTime(item.start + item.dur) + ' · ' + fmtDur(item.dur) +
         (item.desc ? ' · ' + item.desc : '');
       el.querySelector('.x').onclick = e => { e.stopPropagation(); item.del = true; render(); };
+      el.querySelector('.bill').onclick = e => {
+        e.stopPropagation();
+        item.billable = !item.billable; item.dirty = true; render();
+      };
       el.ondblclick = () => {
         const d = prompt('Note for this entry:', item.desc || '');
         if (d !== null) { item.desc = d; item.dirty = true; render(); }
       };
-      el.addEventListener('pointerdown', ev =>
-        startDrag(ev, item, ev.target.classList.contains('grip')));
+      el.addEventListener('pointerdown', ev => {
+        if (ev.target.closest('.bill, .x')) return;   // let those fire their click
+        startDrag(ev, item, ev.target.classList.contains('grip'));
+      });
       box.append(el);
     }
   });
@@ -357,7 +385,10 @@ function nextFreeStart() {
 }
 
 function addEntry(tid, name, start, dur = HOUR) {
-  entries.push({ id: null, tid, name, start, dur, desc: '', dirty: true });
+  entries.push({
+    id: null, tid, name, start, dur, desc: '', dirty: true,
+    billable: store.get('billable') !== false     // default on; ClickUp's API won't infer it
+  });
   render();
 }
 
@@ -368,7 +399,8 @@ async function loadDay() {
     '&end_date=' + (dayAt(days) - 1));
   entries = (r.data || []).filter(t => +t.duration > 0).map(t => ({
     id: t.id, tid: t.task && t.task.id, name: (t.task && t.task.name) || '(no task)',
-    start: +t.start, dur: +t.duration, desc: t.description || ''
+    start: +t.start, dur: +t.duration, desc: t.description || '',
+    billable: !!t.billable, tags: t.tags || []
   }));
   render(); say('');
 }
@@ -378,10 +410,7 @@ async function save() {
   for (const e of entries.filter(e => e.del && e.id))
     await api('/team/' + cfg.teamId + '/time_entries/' + e.id, { method: 'DELETE' });
   for (const e of entries.filter(e => !e.del && e.dirty)) {
-    const body = JSON.stringify({
-      tid: e.tid, description: e.desc || '',
-      start: e.start, end: e.start + e.dur, duration: e.dur
-    });
+    const body = JSON.stringify(entryBody(e));
     if (e.id) await api('/team/' + cfg.teamId + '/time_entries/' + e.id, { method: 'PUT', body });
     else {
       const r = await api('/team/' + cfg.teamId + '/time_entries', { method: 'POST', body });
@@ -437,6 +466,8 @@ function wire() {
     store.set('days', days);
     setDay(days > 1 ? day : Math.max(day, Math.min(startOfDay(Date.now()), addDays(day, 6))));
   };
+  $('#defbill').checked = store.get('billable') !== false;
+  $('#defbill').onchange = e => store.set('billable', e.target.checked);
   $('#prev').onclick = () => setDay(addDays(day, -days));
   $('#next').onclick = () => setDay(addDays(day, days));
   $('#today').onclick = () => setDay(Date.now());
