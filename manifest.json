@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "ClickUp Timesheet",
+  "version": "1.0.0",
+  "description": "Browse spaces/lists to find tasks, then drag time blocks onto a visual day timeline.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.clickup.com/*"],
+  "background": { "service_worker": "sw.js" },
+  "action": { "default_title": "Open ClickUp timesheet" }
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ClickUp Timesheet</title>
+<link rel="stylesheet" href="app.css">
+
+<div id="setup" hidden>
+  <h1>ClickUp Timesheet</h1>
+  <p>Paste a personal API token from
+     <a href="https://app.clickup.com/settings/apps" target="_blank">Settings &rarr; Apps</a>
+     (starts with <code>pk_</code>). It is stored locally in this browser only.</p>
+  <input id="tokenIn" type="password" placeholder="pk_...">
+  <button id="tokenSave">Connect</button>
+  <div id="setupErr" class="err"></div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <strong>Timesheet</strong>
+    <select id="team"></select>
+    <span class="spacer"></span>
+    <button id="view">Week</button>
+    <button id="prev">&lsaquo;</button>
+    <input id="date" type="date">
+    <button id="next">&rsaquo;</button>
+    <button id="today">Today</button>
+    <span class="spacer"></span>
+    <span id="total" class="total">0h00</span>
+    <button id="save" class="primary">Save</button>
+    <button id="logout" title="Forget token">&times;</button>
+  </header>
+  <div id="status"></div>
+  <main>
+    <aside>
+      <input id="q" placeholder="Search spaces, folders, lists, tasks — or paste a task URL + Enter">
+      <div id="tree"></div>
+    </aside>
+    <section id="scroll">
+      <div id="dayhdr"></div>
+      <div id="tl">
+        <div id="gutter"></div>
+        <div id="grid"></div>
+        <div id="blocks"></div>
+      </div>
+    </section>
+  </main>
+  <footer>Drag a task onto the timeline. Drag a block to move, its bottom edge to resize, double-click to edit note.</footer>
+</div>
+
+<script src="app.js" type="module"></script>
