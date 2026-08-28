@@ -306,10 +306,13 @@ function render() {
   const colPct = 100 / days;
   cols.forEach((list, col) => {
     for (const { item, lane, lanes } of layout(list)) {
+      const h = Math.max(item.dur / MIN * PXM, 14);
       const el = document.createElement('div');
-      el.className = 'block' + (item.dirty || !item.id ? ' dirty' : '') + (item.billable ? '' : ' nb');
+      el.className = 'block' + (item.dirty || !item.id ? ' dirty' : '') +
+        (item.billable ? '' : ' nb') +
+        (h < 34 ? ' short' : '');            // too short for two lines — go single-line
       el.style.top = clamp((item.start - dayAt(col)) / MIN * PXM, 0, 24 * 60 * PXM) + 'px';
-      el.style.height = Math.max(item.dur / MIN * PXM, 14) + 'px';
+      el.style.height = h + 'px';
       el.style.left = 'calc(' + ((col + lane / lanes) * colPct) + '% + 2px)';
       el.style.width = 'calc(' + (colPct / lanes) + '% - 4px)';
       el.innerHTML = '<b></b><span></span><div class="bill" title="Billable">$</div>' +

@@ -73,6 +73,15 @@ aside > #q { margin:8px; }
   box-shadow:0 1px 4px #0006; touch-action:none; user-select:none; }
 .block b { display:block; font-weight:600; }
 .block span { color:#ffffffcc; font-size:11px; }
+
+/* short blocks (15–30 min) can't fit two lines: name + meta on one row, clipped */
+.block.short { display:flex; align-items:center; gap:6px; padding:0 34px 0 6px;
+  font-size:11px; line-height:1; }
+.block.short b { display:inline; flex:1 1 auto; min-width:0; overflow:hidden;
+  white-space:nowrap; text-overflow:ellipsis; }
+.block.short span { flex:0 1 auto; min-width:0; overflow:hidden;
+  white-space:nowrap; text-overflow:ellipsis; }
+.block.short .bill, .block.short .x { top:50%; transform:translateY(-50%); }
 .block .x { position:absolute; top:2px; right:4px; opacity:.6; cursor:pointer; }
 .block .x:hover { opacity:1; }
 .block .bill { position:absolute; top:2px; right:18px; cursor:pointer;
