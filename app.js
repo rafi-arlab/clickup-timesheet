@@ -1,5 +1,8 @@
 const API = 'https://api.clickup.com/api/v2';
-const MIN = 60000, HOUR = 3600000, DAY = 86400000, SNAP = 15, PXM = 1;
+const MIN = 60000, HOUR = 3600000, DAY = 86400000, PXM = 1;
+// SNAP is the drag grid in minutes; MIN_DUR is the smallest block you can resize to.
+// At PXM=1 one pixel is one minute, so SNAP=1 gives pixel-accurate times.
+const SNAP = 1, MIN_DUR = 15;
 
 const $ = s => document.querySelector(s);
 
@@ -361,7 +364,7 @@ function startDrag(ev, item, resizing) {
   const move = e => {
     const dm = (e.clientY - y0) / PXM;
     if (resizing) {
-      item.dur = clamp(snap(dur0 / MIN + dm), SNAP, 24 * 60 - min0) * MIN;
+      item.dur = clamp(snap(dur0 / MIN + dm), MIN_DUR, 24 * 60 - min0) * MIN;
     } else {
       const col = clamp(col0 + Math.round((e.clientX - x0) / cw), 0, days - 1);
       const m = clamp(snap(min0 + dm), 0, 24 * 60 - item.dur / MIN);
@@ -512,7 +515,11 @@ function wire() {
 /* ---------- selftest: open app.html#test ---------- */
 function selftest() {
   const A = (c, m) => { if (!c) throw new Error('FAIL ' + m); };
-  A(snap(7) === 0 && snap(8) === 15, 'snap');
+  A(snap(7) === 7 && snap(43) === 43, 'snap keeps whole-minute precision');
+  A(snap(7.4) === 7 && snap(7.6) === 8, 'fractional pixels round to the nearest minute');
+  // the resize floor is independent of the snap grid
+  A(clamp(snap(3), MIN_DUR, 1440) === MIN_DUR, 'resize cannot go below MIN_DUR');
+  A(clamp(snap(17), MIN_DUR, 1440) === 17, 'durations above MIN_DUR are minute-accurate');
   A(fmtDur(5400000) === '1h30', 'fmtDur');
   A(clamp(99, 0, 10) === 10, 'clamp');
   const l = layout([

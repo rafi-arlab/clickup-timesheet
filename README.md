@@ -41,7 +41,8 @@ are a shared zip plus Load unpacked, or `ExtensionInstallForcelist` for managed 
   searchable. Tasks in a *done*-type status stay inline with the open ones.
 - **Timeline**: drag a task onto an hour to create a 1h block, or double-click a task
   to append it after the last block. Drag a block to move it, drag its bottom edge to
-  resize. 15-minute snapping. Overlapping blocks sit side by side.
+  resize. Times are minute-accurate; 15 minutes is the shortest block. Overlapping
+  blocks sit side by side.
 - **Week view** via the header toggle — 7 Monday-anchored columns with per-day totals.
   Drag a block sideways to move it to another day.
 - Double-click a block to add a note (the time entry description). `×` deletes.
