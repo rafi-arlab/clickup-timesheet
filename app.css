@@ -71,7 +71,8 @@ aside > #q { margin:8px; }
 .block { position:absolute; pointer-events:auto; background:var(--accent);
   border-radius:6px; padding:3px 6px; overflow:hidden; cursor:grab;
   box-shadow:0 1px 4px #0006; touch-action:none; user-select:none; }
-.block b { display:block; font-weight:600; }
+/* keep the title clear of the controls sitting on top of that first line */
+.block b { display:block; font-weight:600; padding-right:52px; }
 .block span { color:#ffffffcc; font-size:11px; }
 
 /* short blocks (15–30 min) can't fit two lines: name + meta on one row, clipped */
@@ -80,18 +81,23 @@ aside > #q { margin:8px; }
 /* nothing grows, so every item packs left and the controls end up beside the
    text rather than out at the right edge */
 .block.short b { display:inline; flex:0 1 auto; min-width:0; overflow:hidden;
-  white-space:nowrap; text-overflow:ellipsis; }
+  white-space:nowrap; text-overflow:ellipsis; padding-right:0; }
 .block.short span { flex:0 1 auto; min-width:0; overflow:hidden;
   white-space:nowrap; text-overflow:ellipsis; }
 /* ride inline instead of pinned right; z-index lifts them over the resize grip
    so it can't steal their clicks on a block this short */
+/* scaled back down here — a 15px tall block has no room for the full-size controls */
 .block.short .bill, .block.short .x { position:relative; top:auto; right:auto;
-  transform:none; flex:none; z-index:1; padding:2px; opacity:.85; }
+  transform:none; flex:none; z-index:1; opacity:.85;
+  font-size:12px; padding:1px 3px; }
 .block.short .x:hover, .block.short .bill:hover { opacity:1; }
-.block .x { position:absolute; top:2px; right:4px; opacity:.6; cursor:pointer; }
-.block .x:hover { opacity:1; }
-.block .bill { position:absolute; top:2px; right:18px; cursor:pointer;
-  font-weight:700; line-height:1; }
+.block .x { position:absolute; top:0; right:2px; opacity:.65; cursor:pointer;
+  font-size:17px; line-height:1; padding:2px 5px; border-radius:4px; }
+.block .x:hover { opacity:1; background:#0004; }
+.block .bill { position:absolute; top:2px; right:27px; cursor:pointer;
+  font-weight:700; font-size:14px; line-height:1; padding:2px 4px;
+  border-radius:4px; }
+.block .bill:hover { background:#0004; }
 .block.nb .bill { opacity:.35; text-decoration:line-through; }
 .block.nb { background:#5b5f70; }
 .block .grip { position:absolute; left:0; right:0; bottom:0; height:7px;
