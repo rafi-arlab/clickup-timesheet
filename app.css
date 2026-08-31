@@ -76,20 +76,20 @@ aside > #q { margin:8px; }
 .block span { color:#ffffffcc; font-size:11px; }
 
 /* short blocks (15–30 min) can't fit two lines: name + meta on one row, clipped */
-.block.short { display:flex; align-items:center; gap:6px; padding:0 6px;
+.block.short { display:flex; align-items:center; gap:6px; padding:0 40px 0 6px;
   font-size:11px; line-height:1; }
-/* nothing grows, so every item packs left and the controls end up beside the
-   text rather than out at the right edge */
+/* nothing grows, so the text packs left; the controls stay pinned right */
 .block.short b { display:inline; flex:0 1 auto; min-width:0; overflow:hidden;
   white-space:nowrap; text-overflow:ellipsis; padding-right:0; }
 .block.short span { flex:0 1 auto; min-width:0; overflow:hidden;
   white-space:nowrap; text-overflow:ellipsis; }
-/* ride inline instead of pinned right; z-index lifts them over the resize grip
-   so it can't steal their clicks on a block this short */
-/* scaled back down here — a 15px tall block has no room for the full-size controls */
-.block.short .bill, .block.short .x { position:relative; top:auto; right:auto;
-  transform:none; flex:none; z-index:1; opacity:.85;
-  font-size:12px; padding:1px 3px; }
+/* pinned to the right edge and scaled down — a 15px block has no room for the
+   full-size controls. z-index lifts them over the resize grip, which spans the
+   bottom 7px and would otherwise swallow their clicks at this height. */
+.block.short .bill, .block.short .x { top:50%; transform:translateY(-50%);
+  z-index:1; opacity:.85; font-size:12px; padding:1px 3px; }
+.block.short .x { right:3px; }
+.block.short .bill { right:20px; }
 .block.short .x:hover, .block.short .bill:hover { opacity:1; }
 .block .x { position:absolute; top:0; right:2px; opacity:.65; cursor:pointer;
   font-size:17px; line-height:1; padding:2px 5px; border-radius:4px; }
