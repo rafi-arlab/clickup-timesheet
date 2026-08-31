@@ -75,19 +75,19 @@ aside > #q { margin:8px; }
 .block span { color:#ffffffcc; font-size:11px; }
 
 /* short blocks (15–30 min) can't fit two lines: name + meta on one row, clipped */
-.block.short { display:flex; align-items:center; gap:6px; padding:0 42px 0 6px;
+.block.short { display:flex; align-items:center; gap:6px; padding:0 6px;
   font-size:11px; line-height:1; }
-.block.short b { display:inline; flex:1 1 auto; min-width:0; overflow:hidden;
+/* nothing grows, so every item packs left and the controls end up beside the
+   text rather than out at the right edge */
+.block.short b { display:inline; flex:0 1 auto; min-width:0; overflow:hidden;
   white-space:nowrap; text-overflow:ellipsis; }
 .block.short span { flex:0 1 auto; min-width:0; overflow:hidden;
   white-space:nowrap; text-overflow:ellipsis; }
-/* bigger hit targets, spaced so they don't collide once padded */
-.block.short .bill, .block.short .x { top:50%; transform:translateY(-50%); padding:3px; }
-.block.short .x { right:3px; }
-.block.short .bill { right:22px; }
-/* on a short block the centred buttons sit inside the bottom resize strip, and the
-   grip would swallow their clicks — end the grip before them */
-.block.short .grip { right:42px; }
+/* ride inline instead of pinned right; z-index lifts them over the resize grip
+   so it can't steal their clicks on a block this short */
+.block.short .bill, .block.short .x { position:relative; top:auto; right:auto;
+  transform:none; flex:none; z-index:1; padding:2px; opacity:.85; }
+.block.short .x:hover, .block.short .bill:hover { opacity:1; }
 .block .x { position:absolute; top:2px; right:4px; opacity:.6; cursor:pointer; }
 .block .x:hover { opacity:1; }
 .block .bill { position:absolute; top:2px; right:18px; cursor:pointer;
