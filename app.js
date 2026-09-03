@@ -148,7 +148,7 @@ function branch(label, path, load) {
     load(kids).then(
       () => {
         if (!kids.children.length) kids.textContent = '(empty)';
-        applyFilter($('#q').value);      // tasks that just arrived still have to be filtered
+        applyFilter($('#q').value);      // newly arrived tasks still have to be filtered
       },
       e => { kids.textContent = e.message; kids.className = 'kids err'; }
     );
@@ -314,18 +314,63 @@ function filterNode(el, terms) {
   return hit;
 }
 
-// Tasks load per list on demand, so an unexpanded list is invisible to search.
-// The first real search opens everything once, which kicks off those loads; each
-// one re-runs the filter as it lands. Marked auto so clearing the box collapses them.
-let expandedAll = false;
-function expandAllOnce() {
-  if (expandedAll) return;
-  expandedAll = true;
-  let opened = 0;
-  document.querySelectorAll('#tree details').forEach(d => {
-    if (!d.open) { d.open = true; d.dataset.auto = '1'; opened++; }
-  });
-  if (opened) say('Loading tasks from ' + opened + ' more lists so search can see them…');
+// Search index. Tasks load per list on demand, so an unexpanded list would be
+// invisible to search. Rather than opening every list (one request each, and
+// still capped at 100 tasks per list), page the workspace-wide task endpoint:
+// one request per 100 tasks no matter how many lists exist.
+let taskIndex = null, indexing = null;
+const INDEX_PAGES = 25;            // 2500 tasks; see the cap message below
+
+async function ensureIndex() {
+  if (taskIndex) return taskIndex;
+  if (indexing) return indexing;          // a second keystroke must not start a second sweep
+  indexing = (async () => {
+    const found = [];
+    let page = 0, capped = false;
+    for (; page < INDEX_PAGES; page++) {
+      const r = await api('/team/' + cfg.teamId + '/task?page=' + page +
+        '&subtasks=true&include_closed=true&order_by=updated');
+      const batch = r.tasks || [];
+      found.push(...batch);
+      say('Indexing tasks for search… ' + found.length);
+      if (batch.length < 100) break;      // short page means we reached the end
+      if (page === INDEX_PAGES - 1) capped = true;
+    }
+    taskIndex = found;
+    say(capped ? 'Search covers the ' + found.length + ' most recently updated tasks.' : '');
+    return taskIndex;
+  })();
+  try { return await indexing; } finally { indexing = null; }
+}
+
+// A task matches when every term appears somewhere in its name or its location,
+// so "snapchat adidas" narrows the same way it does in the tree.
+const taskHaystack = t => [t.name, t.list && t.list.name,
+  t.folder && t.folder.name, t.space && t.space.name].map(low).join(' ');
+const matchesTerms = (t, terms) => {
+  const hay = taskHaystack(t);
+  return terms.every(term => hay.includes(term));
+};
+
+// Flat matches from the index, shown above the tree so nothing has to be expanded.
+function renderResults(q) {
+  const old = $('#results');
+  if (old) old.remove();
+  const terms = low(q).split(/\s+/).filter(Boolean);
+  if (!terms.length || !taskIndex) return;
+
+  const hits = taskIndex.filter(t => matchesTerms(t, terms));
+
+  const shown = hits.slice(0, 50);
+  const label = '🔎 Matches (' + hits.length + (hits.length > shown.length ? ', showing 50' : '') + ')';
+  const el = branch(label, '', null);
+  el.id = 'results';
+  delete el.dataset.path;            // managed here, not by the tree filter
+  const box = el.querySelector(':scope > .kids');
+  shown.forEach(t => box.append(taskEl(t, 'results')));
+  if (!shown.length) box.textContent = 'No task matches — try fewer words.';
+  $('#tree').prepend(el);
+  el.open = true;
 }
 
 function applyFilter(q) {
@@ -599,10 +644,13 @@ function wire() {
   $('#date').onchange = e => e.target.value && setDay(new Date(e.target.value + 'T00:00'));
   $('#save').onclick = guard(save);
 
-  $('#q').oninput = e => {
-    if (e.target.value.trim().length >= 2) expandAllOnce();
-    applyFilter(e.target.value);
-  };
+  $('#q').oninput = guard(async e => {
+    const q = e.target.value;
+    applyFilter(q);                        // tree filtering is instant, do it first
+    if (q.trim().length < 2) return renderResults('');
+    await ensureIndex();
+    if ($('#q').value === q) renderResults(q);   // ignore a stale sweep
+  });
   $('#q').onkeydown = guard(async e => {
     if (e.key !== 'Enter') return;
     const m = e.target.value.match(/\/t\/([\w-]+)/);
