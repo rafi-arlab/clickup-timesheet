@@ -219,9 +219,24 @@ function recentTasks(data, limit = 15) {
   return [...seen.values()];
 }
 
+// Two phases: My tasks renders as soon as it arrives, then the rest of the
+// workspace fills in underneath. Nothing waits for the slowest call.
 async function loadTree() {
-  const tree = $('#tree'); tree.textContent = 'Loading structure…';
-  const me = await api('/user');
+  const tree = $('#tree'); tree.textContent = '';
+
+  const mine = branch('★ My tasks', 'my tasks', async box => {
+    const me = await api('/user');
+    const r = await api('/team/' + cfg.teamId + '/task?assignees[]=' + me.user.id +
+      '&include_closed=true&subtasks=true&order_by=updated');
+    renderTasks(box, r.tasks, 'my tasks');
+  });
+  tree.append(mine); mine.open = true;      // opening it starts its own fetch
+
+  const pending = document.createElement('div');
+  pending.className = 'kids';
+  pending.textContent = 'Loading the rest of the workspace…';
+  tree.append(pending);
+
   const now = Date.now();
   const [{ spaces }, shared, recent] = await Promise.all([
     api('/team/' + cfg.teamId + '/space?archived=false'),
@@ -241,13 +256,7 @@ async function loadTree() {
     return { sp, folders: f.folders || [], lists: l.lists || [], err: f.err || l.err };
   }));
 
-  tree.textContent = '';
-  const mine = branch('★ My tasks', 'my tasks', async box => {
-    const r = await api('/team/' + cfg.teamId + '/task?assignees[]=' + me.user.id +
-      '&include_closed=true&subtasks=true&order_by=updated');
-    renderTasks(box, r.tasks, 'my tasks');
-  });
-  tree.append(mine); mine.open = true;
+  pending.remove();
 
   const recents = recentTasks(recent.data);
   if (recents.length) {
@@ -616,8 +625,8 @@ async function boot() {
   cfg.teamId = teams.some(t => t.id === cfg.teamId) ? cfg.teamId : teams[0].id;
   $('#team').value = cfg.teamId;
   store.set('teamId', cfg.teamId);
-  await loadTree();
-  setDay(day);
+  setDay(day);                 // timeline and sidebar load independently
+  guard(loadTree)();
   $('#scroll').scrollTop = 7 * 60 * PXM;
 }
 
@@ -627,7 +636,7 @@ function wire() {
   $('#team').onchange = guard(async () => {
     cfg.teamId = $('#team').value;
     store.set('teamId', cfg.teamId);
-    await loadTree(); setDay(day);
+    setDay(day); guard(loadTree)();
   });
   $('#view').onclick = () => {
     days = days > 1 ? 1 : 7;
