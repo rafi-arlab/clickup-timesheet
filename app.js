@@ -255,7 +255,7 @@ async function loadTree() {
     const rEl = branch('🕘 Recent (' + recents.length + ')', rPath, null);
     const rBox = rEl.querySelector(':scope > .kids');
     recents.forEach(t => rBox.append(taskEl(t, rPath)));
-    tree.prepend(rEl); rEl.open = true;
+    tree.append(rEl); rEl.open = true;      // below My tasks, which leads
   }
 
   // Things shared directly with you live outside the space→folder→list walk above,
