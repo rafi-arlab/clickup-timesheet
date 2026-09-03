@@ -175,6 +175,7 @@ function renderTasks(box, tasks, path) {
   box.textContent = '';
   const open = [], closed = [];
   (tasks || []).forEach(t => (isClosed(t) ? closed : open).push(t));
+  open.sort(byRecency); closed.sort(byRecency);
   open.forEach(t => box.append(taskEl(t, path)));
   if (!closed.length) return;
   const cPath = path + ' closed';
@@ -187,7 +188,7 @@ function renderTasks(box, tasks, path) {
 const listBranch = (l, parent) => {
   const path = parent + ' ' + low(l.name);
   return branch('▤ ' + l.name, path, async box => {
-    const r = await api('/list/' + l.id + '/task?archived=false&subtasks=true&include_closed=true');
+    const r = await api('/list/' + l.id + '/task?archived=false&subtasks=true&include_closed=true&order_by=updated');
     renderTasks(box, r.tasks, path);
   });
 };
@@ -206,18 +207,23 @@ const errLine = (msg, path) => {
   return e;
 };
 
-// Most people log to the same handful of tasks all week, so surface those first.
-// Derived from time entries we can fetch in one call rather than any extra state.
-function recentTasks(data, limit = 15) {
-  const seen = new Map();
-  for (const t of (data || []).slice().sort((a, b) => +b.start - +a.start)) {
-    const task = t.task;
-    if (!task || !task.id || seen.has(task.id)) continue;
-    seen.set(task.id, task);
-    if (seen.size >= limit) break;
+// taskId -> when you last logged time against it, from the last 30 days of
+// entries. Tasks you actually worked on outrank ones merely edited recently.
+let lastLogged = new Map();
+function indexLastLogged(data) {
+  const m = new Map();
+  for (const e of data || []) {
+    const id = e.task && e.task.id;
+    if (!id) continue;
+    const at = +e.start || 0;
+    if (at > (m.get(id) || 0)) m.set(id, at);
   }
-  return [...seen.values()];
+  return m;
 }
+
+// Recency for sorting: last logged, else last updated, else unknown (sorts last).
+const recencyOf = t => lastLogged.get(t.id) || +(t.date_updated || 0) || 0;
+const byRecency = (a, b) => recencyOf(b) - recencyOf(a);
 
 // Two phases: My tasks renders as soon as it arrives, then the rest of the
 // workspace fills in underneath. Nothing waits for the slowest call.
@@ -256,16 +262,8 @@ async function loadTree() {
     return { sp, folders: f.folders || [], lists: l.lists || [], err: f.err || l.err };
   }));
 
+  lastLogged = indexLastLogged(recent.data);
   pending.remove();
-
-  const recents = recentTasks(recent.data);
-  if (recents.length) {
-    const rPath = 'recent';
-    const rEl = branch('🕘 Recent (' + recents.length + ')', rPath, null);
-    const rBox = rEl.querySelector(':scope > .kids');
-    recents.forEach(t => rBox.append(taskEl(t, rPath)));
-    tree.append(rEl); rEl.open = true;      // below My tasks, which leads
-  }
 
   // Things shared directly with you live outside the space→folder→list walk above,
   // because you don't have access to their parent. Separate endpoint.
@@ -370,6 +368,7 @@ function renderResults(q) {
 
   const hits = taskIndex.filter(t => matchesTerms(t, terms));
 
+  hits.sort(byRecency);
   const shown = hits.slice(0, 50);
   const label = '🔎 Matches (' + hits.length + (hits.length > shown.length ? ', showing 50' : '') + ')';
   const el = branch(label, '', null);
