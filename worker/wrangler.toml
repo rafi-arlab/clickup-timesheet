@@ -4,4 +4,4 @@ compatibility_date = "2026-01-01"
 
 [vars]
 # The exact origin of the timesheet page. Not "*" — this endpoint mints tokens.
-ALLOWED_ORIGIN = "https://rafi-arlab.github.io"
+ALLOWED_ORIGIN = "https://clickup-timesheet.rafiharake4.workers.dev"
