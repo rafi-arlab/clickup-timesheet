@@ -21,38 +21,6 @@ Each person's token stays in their own browser's `localStorage` and is sent only
 `api.clickup.com`. Note that whoever controls the host can change the JavaScript, so your
 team is trusting the host — normal for an internal tool, worth saying out loud.
 
-## Optional: "Connect ClickUp" login instead of pasting a token
-
-Off by default. The token box is all you need for a few people; this is worth turning
-on when non-technical teammates start using it, since pasting an API token is the main
-drop-off point.
-
-ClickUp's token endpoint requires `client_secret` and has no PKCE, so the code→token
-exchange cannot happen in the browser. That one step needs a server. Everything else
-stays browser → ClickUp direct, so no timesheet data passes through it.
-
-1. **Register the app.** A Workspace owner or admin: ClickUp → Settings → Apps →
-   *Create new app*. Redirect URL = the exact page URL (e.g.
-   `https://rafi-arlab.github.io/clickup-timesheet/`). Note the `client_id` and secret.
-2. **Deploy the Worker** in `worker/`:
-   ```
-   cd worker
-   npx wrangler secret put CLICKUP_CLIENT_ID
-   npx wrangler secret put CLICKUP_CLIENT_SECRET
-   npx wrangler deploy
-   ```
-   Set `ALLOWED_ORIGIN` in `wrangler.toml` to your site's origin first — it's the exact
-   origin rather than `*` because this endpoint hands out credentials.
-3. **Fill in `OAUTH` at the top of `app.js`** with the `client_id` and the deployed
-   Worker URL. The Connect button appears once both are set; leave either blank and the
-   token path is all that shows.
-
-Notes: OAuth tokens are sent as `Authorization: Bearer …`, personal tokens bare — the
-app tracks which mode you're in. ClickUp OAuth tokens currently don't expire, so it's a
-one-time connect, and authorized Workspaces come from `/oauth/team` rather than `/team`.
-The `state` parameter is verified on return; if a login is ever rejected with a state
-mismatch on the very first attempt, check that ClickUp is echoing `state` back.
-
 ## Run it as a Chrome extension
 
 1. `chrome://extensions` → **Developer mode** → **Load unpacked** → pick this folder.
