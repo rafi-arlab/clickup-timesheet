@@ -493,8 +493,10 @@ async function finishOauth() {
 }
 
 async function boot() {
-  // under OAuth the authorized Workspaces come from a dedicated endpoint
-  const { teams } = await api('/oauth/team');
+  // /team returns exactly the Workspaces this token is authorized for.
+  // There is no /oauth/team — that path 404s, and because ClickUp omits CORS
+  // headers on error responses the browser reports it as "Failed to fetch".
+  const { teams } = await api('/team');
   $('#team').textContent = '';
   for (const t of teams) {
     const o = document.createElement('option');
