@@ -2,8 +2,8 @@ const API = 'https://api.clickup.com/api/v2';
 
 // Fill these in after a Workspace admin registers the OAuth app
 // (ClickUp → Settings → Apps → Create new app), with the redirect URL set to
-// this page's URL. Leave clientId empty and the Connect button stays hidden,
-// so the personal-token path keeps working untouched.
+// this page's URL. Leave clientId empty and the login button stays hidden, with
+// an on-screen note saying login is not configured yet.
 const OAUTH = {
   clientId: '',
   exchangeUrl: ''            // Cloudflare Worker that swaps code → token (see worker/)
@@ -25,7 +25,7 @@ const store = {
     .forEach(k => localStorage.removeItem(k))
 };
 
-let cfg = { token: '', teamId: '', days: 1, mode: 'token' };  // mode: 'token' | 'oauth'
+let cfg = { token: '', teamId: '', days: 1 };
 let day;                 // start of the first visible day
 let days = 1;            // 1 = day view, 7 = week view
 let entries = [];        // entry: {id,tid,name,start,dur,desc,dirty,del}
@@ -96,8 +96,7 @@ async function api(path, opts = {}, retries = 2) {
   const r = await fetch(API + path, {
     ...opts,
     headers: {
-      // OAuth tokens are Bearer; personal tokens are sent bare
-      Authorization: (cfg.mode === 'oauth' ? 'Bearer ' : '') + cfg.token,
+      Authorization: 'Bearer ' + cfg.token,   // OAuth tokens are always Bearer
       'Content-Type': 'application/json'
     }
   });
@@ -488,14 +487,14 @@ async function finishOauth() {
   clean();
   if (!r.ok || !data.access_token) throw new Error(data.error || 'Token exchange failed (' + r.status + ')');
 
-  cfg.token = data.access_token; cfg.mode = 'oauth';
+  cfg.token = data.access_token;
   store.set('token', cfg.token); store.set('mode', 'oauth');
   return true;
 }
 
 async function boot() {
-  // with an OAuth token, the authorized Workspaces come from a dedicated endpoint
-  const { teams } = await api(cfg.mode === 'oauth' ? '/oauth/team' : '/team');
+  // under OAuth the authorized Workspaces come from a dedicated endpoint
+  const { teams } = await api('/oauth/team');
   $('#team').textContent = '';
   for (const t of teams) {
     const o = document.createElement('option');
@@ -511,19 +510,7 @@ async function boot() {
 }
 
 function wire() {
-  $('#tokenSave').onclick = guard(async () => {
-    cfg.token = $('#tokenIn').value.trim();
-    cfg.mode = 'token';
-    await api('/user');                       // validate before persisting
-    store.set('token', cfg.token); store.set('mode', 'token');
-    $('#setup').hidden = true; $('#app').hidden = false;
-    await boot();
-  });
   $('#connect').onclick = startOauth;
-  $('#useToken').onclick = e => {
-    e.preventDefault();
-    $('#oauthBox').hidden = true; $('#tokenBox').hidden = false;
-  };
   $('#logout').onclick = () => { store.clear(); location.reload(); };
   $('#team').onchange = guard(async () => {
     cfg.teamId = $('#team').value;
@@ -645,19 +632,21 @@ function selftest() {
 function showSetup(err) {
   $('#setup').hidden = false;
   $('#app').hidden = true;
-  // only offer Connect once the OAuth app is actually configured
-  $('#oauthBox').hidden = !oauthReady();
-  $('#tokenBox').hidden = oauthReady();
-  if (err) $('#setupErr').textContent = err;
+  // no point offering a login button that can't work yet
+  $('#connect').hidden = !oauthReady();
+  $('#setupErr').textContent = err || (oauthReady() ? '' :
+    'Login is not configured yet — set OAUTH.clientId and OAUTH.exchangeUrl in app.js.');
 }
 
 (async () => {
   wire();
   if (location.hash === '#test') return selftest();
-  cfg.token = store.get('token') || '';
   cfg.teamId = store.get('teamId') || '';
-  cfg.mode = store.get('mode') === 'oauth' ? 'oauth' : 'token';
   days = store.get('days') === 7 ? 7 : 1;
+  // A pk_ token saved by the older paste-a-token build would now go out as a
+  // Bearer token and be rejected, so drop it and ask for a real login instead.
+  if (store.get('mode') !== 'oauth') { store.set('token', null); store.set('mode', null); }
+  cfg.token = store.get('token') || '';
 
   try {
     if (await finishOauth()) { /* token now in cfg */ }
