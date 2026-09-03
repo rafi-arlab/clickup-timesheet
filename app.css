@@ -105,3 +105,9 @@ aside > #q { margin:8px; }
 .block.dirty { outline:2px solid var(--ok); outline-offset:-2px; }
 #tl.over { background:#7b68ee14; }
 .now { position:absolute; border-top:2px solid var(--err); pointer-events:none; }
+
+/* setup screen */
+#setup h1 { margin-bottom:16px; }
+#setup .dim { color:var(--dim); }
+button.big { font-size:15px; padding:10px 18px; }
+#oauthBox p { margin:12px 0; }

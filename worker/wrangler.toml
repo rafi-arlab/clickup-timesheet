@@ -1,0 +1,7 @@
+name = "clickup-timesheet-oauth"
+main = "oauth-worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# The exact origin of the timesheet page. Not "*" — this endpoint mints tokens.
+ALLOWED_ORIGIN = "https://rafi-arlab.github.io"

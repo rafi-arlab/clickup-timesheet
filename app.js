@@ -1,4 +1,15 @@
 const API = 'https://api.clickup.com/api/v2';
+
+// Fill these in after a Workspace admin registers the OAuth app
+// (ClickUp → Settings → Apps → Create new app), with the redirect URL set to
+// this page's URL. Leave clientId empty and the Connect button stays hidden,
+// so the personal-token path keeps working untouched.
+const OAUTH = {
+  clientId: '',
+  exchangeUrl: ''            // Cloudflare Worker that swaps code → token (see worker/)
+};
+const oauthReady = () => !!(OAUTH.clientId && OAUTH.exchangeUrl);
+const redirectUri = () => location.origin + location.pathname;
 const MIN = 60000, HOUR = 3600000, DAY = 86400000, PXM = 1;
 // SNAP is the drag grid in minutes; MIN_DUR is the smallest block you can resize to.
 // At PXM=1 one pixel is one minute, so SNAP=1 gives pixel-accurate times.
@@ -14,7 +25,7 @@ const store = {
     .forEach(k => localStorage.removeItem(k))
 };
 
-let cfg = { token: '', teamId: '', days: 1 };
+let cfg = { token: '', teamId: '', days: 1, mode: 'token' };  // mode: 'token' | 'oauth'
 let day;                 // start of the first visible day
 let days = 1;            // 1 = day view, 7 = week view
 let entries = [];        // entry: {id,tid,name,start,dur,desc,dirty,del}
@@ -84,7 +95,11 @@ const colWidth = () => $('#blocks').clientWidth / days;
 async function api(path, opts = {}, retries = 2) {
   const r = await fetch(API + path, {
     ...opts,
-    headers: { Authorization: cfg.token, 'Content-Type': 'application/json' }
+    headers: {
+      // OAuth tokens are Bearer; personal tokens are sent bare
+      Authorization: (cfg.mode === 'oauth' ? 'Bearer ' : '') + cfg.token,
+      'Content-Type': 'application/json'
+    }
   });
   // 429 means ClickUp never processed it, so retrying is safe even for POST.
   if (r.status === 429 && retries) {
@@ -437,8 +452,50 @@ function setDay(t) {
   guard(loadDay)();
 }
 
+/* ---------- oauth ---------- */
+function startOauth() {
+  // state guards against someone feeding us an authorization code we didn't ask for
+  const state = crypto.randomUUID();
+  store.set('oauthState', state);
+  location.href = 'https://app.clickup.com/api?client_id=' + encodeURIComponent(OAUTH.clientId) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri()) +
+    '&state=' + encodeURIComponent(state);
+}
+
+// Returns true if this load was an OAuth redirect back from ClickUp (handled or failed).
+async function finishOauth() {
+  const q = new URLSearchParams(location.search);
+  const code = q.get('code');
+  if (!code && !q.get('error')) return false;
+
+  // strip the code out of the URL and history either way — it is single-use
+  const clean = () => history.replaceState(null, '', redirectUri());
+  const expected = store.get('oauthState');
+  store.set('oauthState', null);
+
+  if (q.get('error')) { clean(); throw new Error('ClickUp denied the request: ' + q.get('error')); }
+  if (!expected || q.get('state') !== expected) {
+    clean();
+    throw new Error('Login state did not match, so the request was discarded. Try Connect again.');
+  }
+
+  const r = await fetch(OAUTH.exchangeUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await r.json().catch(() => ({}));
+  clean();
+  if (!r.ok || !data.access_token) throw new Error(data.error || 'Token exchange failed (' + r.status + ')');
+
+  cfg.token = data.access_token; cfg.mode = 'oauth';
+  store.set('token', cfg.token); store.set('mode', 'oauth');
+  return true;
+}
+
 async function boot() {
-  const { teams } = await api('/team');
+  // with an OAuth token, the authorized Workspaces come from a dedicated endpoint
+  const { teams } = await api(cfg.mode === 'oauth' ? '/oauth/team' : '/team');
   $('#team').textContent = '';
   for (const t of teams) {
     const o = document.createElement('option');
@@ -456,11 +513,17 @@ async function boot() {
 function wire() {
   $('#tokenSave').onclick = guard(async () => {
     cfg.token = $('#tokenIn').value.trim();
+    cfg.mode = 'token';
     await api('/user');                       // validate before persisting
-    store.set('token', cfg.token);
+    store.set('token', cfg.token); store.set('mode', 'token');
     $('#setup').hidden = true; $('#app').hidden = false;
     await boot();
   });
+  $('#connect').onclick = startOauth;
+  $('#useToken').onclick = e => {
+    e.preventDefault();
+    $('#oauthBox').hidden = true; $('#tokenBox').hidden = false;
+  };
   $('#logout').onclick = () => { store.clear(); location.reload(); };
   $('#team').onchange = guard(async () => {
     cfg.teamId = $('#team').value;
@@ -579,13 +642,30 @@ function selftest() {
   document.title = 'selftest OK';
 }
 
+function showSetup(err) {
+  $('#setup').hidden = false;
+  $('#app').hidden = true;
+  // only offer Connect once the OAuth app is actually configured
+  $('#oauthBox').hidden = !oauthReady();
+  $('#tokenBox').hidden = oauthReady();
+  if (err) $('#setupErr').textContent = err;
+}
+
 (async () => {
   wire();
   if (location.hash === '#test') return selftest();
   cfg.token = store.get('token') || '';
   cfg.teamId = store.get('teamId') || '';
+  cfg.mode = store.get('mode') === 'oauth' ? 'oauth' : 'token';
   days = store.get('days') === 7 ? 7 : 1;
-  if (!cfg.token) { $('#setup').hidden = false; return; }
+
+  try {
+    if (await finishOauth()) { /* token now in cfg */ }
+  } catch (e) {
+    return showSetup(e.message);
+  }
+
+  if (!cfg.token) return showSetup();
   $('#app').hidden = false;
   guard(boot)();
 })();

@@ -5,11 +5,22 @@
 
 <div id="setup" hidden>
   <h1>ClickUp Timesheet</h1>
-  <p>Paste a personal API token from
-     <a href="https://app.clickup.com/settings/apps" target="_blank">Settings &rarr; Apps</a>
-     (starts with <code>pk_</code>). It is stored locally in this browser only.</p>
-  <input id="tokenIn" type="password" placeholder="pk_...">
-  <button id="tokenSave">Connect</button>
+
+  <div id="oauthBox" hidden>
+    <button id="connect" class="primary big">Connect ClickUp</button>
+    <p class="dim">You'll approve access in ClickUp and choose which Workspaces to share.
+       Your login stays with ClickUp &mdash; this page never sees your password.</p>
+    <p><a href="#" id="useToken">Use a personal API token instead</a></p>
+  </div>
+
+  <div id="tokenBox">
+    <p>Paste a personal API token from
+       <a href="https://app.clickup.com/settings/apps" target="_blank">Settings &rarr; Apps</a>
+       (starts with <code>pk_</code>). It is stored locally in this browser only.</p>
+    <input id="tokenIn" type="password" placeholder="pk_...">
+    <button id="tokenSave">Connect</button>
+  </div>
+
   <div id="setupErr" class="err"></div>
 </div>
 
