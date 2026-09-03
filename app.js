@@ -1,14 +1,17 @@
-const API = 'https://api.clickup.com/api/v2';
-
 // Currently pointed at the app registered in a personal test Workspace.
 // For the company rollout an admin must register a second app whose redirect URL
 // is the production page URL, then swap clientId here and the two Worker secrets.
 // Blank clientId hides the login button and says so on screen.
 const OAUTH = {
   clientId: 'XFU7D3EJGKD0NT7TUVNPKE8RVM6PBEME',
-  exchangeUrl: 'https://clickup-oauth.rafiharake4.workers.dev'   // see worker/
+  worker: 'https://clickup-oauth.rafiharake4.workers.dev'   // see worker/
 };
-const oauthReady = () => !!(OAUTH.clientId && OAUTH.exchangeUrl);
+const oauthReady = () => !!(OAUTH.clientId && OAUTH.worker);
+
+// Calls go through the Worker, not straight to ClickUp: ClickUp returns CORS
+// headers on the preflight but not on the actual response to an OAuth Bearer
+// request, so the browser discards an otherwise-fine 200.
+const API = OAUTH.worker + '/api/v2';
 const redirectUri = () => location.origin + location.pathname;
 const MIN = 60000, HOUR = 3600000, DAY = 86400000, PXM = 1;
 // SNAP is the drag grid in minutes; MIN_DUR is the smallest block you can resize to.
@@ -489,14 +492,14 @@ async function finishOauth() {
 
   let r;
   try {
-    r = await fetch(OAUTH.exchangeUrl, {
+    r = await fetch(OAUTH.worker + '/exchange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
     });
   } catch (e) {
     clean();
-    throw new Error('Could not reach the login service at ' + OAUTH.exchangeUrl +
+    throw new Error('Could not reach the login service at ' + OAUTH.worker +
       ' (' + e.message + ')');
   }
   const data = await r.json().catch(() => ({}));
@@ -653,7 +656,7 @@ function showSetup(err) {
   // no point offering a login button that can't work yet
   $('#connect').hidden = !oauthReady();
   $('#setupErr').textContent = err || (oauthReady() ? '' :
-    'Login is not configured yet — set OAUTH.clientId and OAUTH.exchangeUrl in app.js.');
+    'Login is not configured yet — set OAUTH.clientId and OAUTH.worker in app.js.');
 }
 
 (async () => {
