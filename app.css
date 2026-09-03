@@ -1,7 +1,30 @@
-:root {
+/* Every colour comes from these, so a theme is just a palette swap.
+   --nb is the muted fill for non-billable blocks. */
+:root, :root[data-theme="dark"] {
   --bg:#14161a; --panel:#1b1e24; --line:#2b3038; --fg:#e6e9ef; --dim:#8b93a1;
-  --accent:#7b68ee; --ok:#2ecc71; --err:#ff6b6b;
+  --accent:#7b68ee; --ok:#2ecc71; --err:#ff6b6b; --nb:#5b5f70;
+  --blockfg:#fff;
   --hour:60px;
+}
+:root[data-theme="light"] {
+  --bg:#f6f7f9; --panel:#fff; --line:#dde1e7; --fg:#1b1e24; --dim:#6b7280;
+  --accent:#6c5ce7; --ok:#129d5b; --err:#d93a3a; --nb:#9aa2b1;
+  --blockfg:#fff;
+}
+:root[data-theme="ocean"] {
+  --bg:#0d1b2a; --panel:#152a3d; --line:#24405c; --fg:#e2eaf2; --dim:#89a2ba;
+  --accent:#2f8fbf; --ok:#2ec4a6; --err:#ff7b72; --nb:#41576e;
+  --blockfg:#fff;
+}
+:root[data-theme="forest"] {
+  --bg:#121a15; --panel:#1a2620; --line:#2c3d33; --fg:#e6efe8; --dim:#8ba394;
+  --accent:#3f9d63; --ok:#7bc96f; --err:#e5734f; --nb:#4a5c51;
+  --blockfg:#fff;
+}
+:root[data-theme="sunset"] {
+  --bg:#1c1519; --panel:#271c22; --line:#3d2c35; --fg:#f4e9ec; --dim:#a8909a;
+  --accent:#e0725c; --ok:#e0a95c; --err:#ff6b6b; --nb:#6b5058;
+  --blockfg:#fff;
 }
 * { box-sizing:border-box; }
 body { margin:0; height:100vh; display:flex; flex-direction:column;
@@ -70,10 +93,11 @@ aside > #q { margin:8px; }
 #blocks { left:52px; pointer-events:none; }
 .block { position:absolute; pointer-events:auto; background:var(--accent);
   border-radius:6px; padding:3px 6px; overflow:hidden; cursor:grab;
+  color:var(--blockfg);
   box-shadow:0 1px 4px #0006; touch-action:none; user-select:none; }
 /* keep the title clear of the controls sitting on top of that first line */
 .block b { display:block; font-weight:600; padding-right:52px; }
-.block span { color:#ffffffcc; font-size:11px; }
+.block span { color:var(--blockfg); opacity:.8; font-size:11px; }
 
 /* short blocks (15–30 min) can't fit two lines: name + meta on one row, clipped */
 .block.short { display:flex; align-items:center; gap:6px; padding:0 40px 0 6px;
@@ -99,11 +123,11 @@ aside > #q { margin:8px; }
   border-radius:4px; }
 .block .bill:hover { background:#0004; }
 .block.nb .bill { opacity:.35; text-decoration:line-through; }
-.block.nb { background:#5b5f70; }
+.block.nb { background:var(--nb); }
 .block .grip { position:absolute; left:0; right:0; bottom:0; height:7px;
   cursor:ns-resize; }
 .block.dirty { outline:2px solid var(--ok); outline-offset:-2px; }
-#tl.over { background:#7b68ee14; }
+#tl.over { background:color-mix(in srgb, var(--accent) 10%, transparent); }
 .now { position:absolute; border-top:2px solid var(--err); pointer-events:none; }
 
 /* setup screen */

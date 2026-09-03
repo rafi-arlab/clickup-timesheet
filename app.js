@@ -20,6 +20,10 @@ const SNAP = 1, MIN_DUR = 15;
 
 const $ = s => document.querySelector(s);
 
+const THEMES = ['dark', 'light', 'ocean', 'forest', 'sunset'];
+const applyTheme = t =>
+  document.documentElement.dataset.theme = THEMES.includes(t) ? t : 'dark';
+
 // localStorage works in both an extension page and a plain website, so one build serves both
 const store = {
   get: k => { try { return JSON.parse(localStorage.getItem('cu_' + k)); } catch { return null; } },
@@ -142,7 +146,10 @@ function branch(label, path, load) {
     if (!d.open || kids.dataset.loaded) return;
     kids.dataset.loaded = '1'; kids.textContent = '…';
     load(kids).then(
-      () => { if (!kids.children.length) kids.textContent = '(empty)'; },
+      () => {
+        if (!kids.children.length) kids.textContent = '(empty)';
+        applyFilter($('#q').value);      // tasks that just arrived still have to be filtered
+      },
       e => { kids.textContent = e.message; kids.className = 'kids err'; }
     );
   });
@@ -199,12 +206,28 @@ const errLine = (msg, path) => {
   return e;
 };
 
+// Most people log to the same handful of tasks all week, so surface those first.
+// Derived from time entries we can fetch in one call rather than any extra state.
+function recentTasks(data, limit = 15) {
+  const seen = new Map();
+  for (const t of (data || []).slice().sort((a, b) => +b.start - +a.start)) {
+    const task = t.task;
+    if (!task || !task.id || seen.has(task.id)) continue;
+    seen.set(task.id, task);
+    if (seen.size >= limit) break;
+  }
+  return [...seen.values()];
+}
+
 async function loadTree() {
   const tree = $('#tree'); tree.textContent = 'Loading structure…';
   const me = await api('/user');
-  const [{ spaces }, shared] = await Promise.all([
+  const now = Date.now();
+  const [{ spaces }, shared, recent] = await Promise.all([
     api('/team/' + cfg.teamId + '/space?archived=false'),
-    api('/team/' + cfg.teamId + '/shared').catch(e => ({ err: e.message }))
+    api('/team/' + cfg.teamId + '/shared').catch(e => ({ err: e.message })),
+    api('/team/' + cfg.teamId + '/time_entries?start_date=' + (now - 30 * DAY) +
+      '&end_date=' + now).catch(() => ({}))
   ]);
 
   // Load every Space's folders + folderless lists up front so search can see them.
@@ -225,6 +248,15 @@ async function loadTree() {
     renderTasks(box, r.tasks, 'my tasks');
   });
   tree.append(mine); mine.open = true;
+
+  const recents = recentTasks(recent.data);
+  if (recents.length) {
+    const rPath = 'recent';
+    const rEl = branch('🕘 Recent (' + recents.length + ')', rPath, null);
+    const rBox = rEl.querySelector(':scope > .kids');
+    recents.forEach(t => rBox.append(taskEl(t, rPath)));
+    tree.prepend(rEl); rEl.open = true;
+  }
 
   // Things shared directly with you live outside the space→folder→list walk above,
   // because you don't have access to their parent. Separate endpoint.
@@ -280,6 +312,20 @@ function filterNode(el, terms) {
   el.hidden = !hit;
   if (hit && !el.open) { el.open = true; el.dataset.auto = '1'; }
   return hit;
+}
+
+// Tasks load per list on demand, so an unexpanded list is invisible to search.
+// The first real search opens everything once, which kicks off those loads; each
+// one re-runs the filter as it lands. Marked auto so clearing the box collapses them.
+let expandedAll = false;
+function expandAllOnce() {
+  if (expandedAll) return;
+  expandedAll = true;
+  let opened = 0;
+  document.querySelectorAll('#tree details').forEach(d => {
+    if (!d.open) { d.open = true; d.dataset.auto = '1'; opened++; }
+  });
+  if (opened) say('Loading tasks from ' + opened + ' more lists so search can see them…');
 }
 
 function applyFilter(q) {
@@ -543,6 +589,8 @@ function wire() {
     store.set('days', days);
     setDay(days > 1 ? day : Math.max(day, Math.min(startOfDay(Date.now()), addDays(day, 6))));
   };
+  $('#theme').value = document.documentElement.dataset.theme;
+  $('#theme').onchange = e => { applyTheme(e.target.value); store.set('theme', e.target.value); };
   $('#defbill').checked = store.get('billable') !== false;
   $('#defbill').onchange = e => store.set('billable', e.target.checked);
   $('#prev').onclick = () => setDay(addDays(day, -days));
@@ -551,7 +599,10 @@ function wire() {
   $('#date').onchange = e => e.target.value && setDay(new Date(e.target.value + 'T00:00'));
   $('#save').onclick = guard(save);
 
-  $('#q').oninput = e => applyFilter(e.target.value);
+  $('#q').oninput = e => {
+    if (e.target.value.trim().length >= 2) expandAllOnce();
+    applyFilter(e.target.value);
+  };
   $('#q').onkeydown = guard(async e => {
     if (e.key !== 'Enter') return;
     const m = e.target.value.match(/\/t\/([\w-]+)/);
@@ -660,6 +711,7 @@ function showSetup(err) {
 }
 
 (async () => {
+  applyTheme(store.get('theme'));      // before wire(), so the select shows the right value
   wire();
   if (location.hash === '#test') return selftest();
   cfg.teamId = store.get('teamId') || '';
