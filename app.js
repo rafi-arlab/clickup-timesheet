@@ -93,13 +93,22 @@ const colWidth = () => $('#blocks').clientWidth / days;
 
 /* ---------- api ---------- */
 async function api(path, opts = {}, retries = 2) {
-  const r = await fetch(API + path, {
-    ...opts,
-    headers: {
-      Authorization: 'Bearer ' + cfg.token,   // OAuth tokens are always Bearer
-      'Content-Type': 'application/json'
-    }
-  });
+  let r;
+  try {
+    r = await fetch(API + path, {
+      ...opts,
+      headers: {
+        Authorization: 'Bearer ' + cfg.token,   // OAuth tokens are always Bearer
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (e) {
+    // ClickUp omits CORS headers on error responses, so any 4xx/5xx arrives as
+    // an opaque "Failed to fetch". Name the request so it is at least findable.
+    throw new Error('Request to ' + (opts.method || 'GET') + ' ' + path +
+      ' was blocked or failed (' + e.message + '). ClickUp hides the status on ' +
+      'error responses — check the Network tab for the real code.');
+  }
   // 429 means ClickUp never processed it, so retrying is safe even for POST.
   if (r.status === 429 && retries) {
     const reset = +r.headers.get('x-ratelimit-reset') * 1000 - Date.now();
@@ -478,11 +487,18 @@ async function finishOauth() {
     throw new Error('Login state did not match, so the request was discarded. Try Connect again.');
   }
 
-  const r = await fetch(OAUTH.exchangeUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  });
+  let r;
+  try {
+    r = await fetch(OAUTH.exchangeUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+  } catch (e) {
+    clean();
+    throw new Error('Could not reach the login service at ' + OAUTH.exchangeUrl +
+      ' (' + e.message + ')');
+  }
   const data = await r.json().catch(() => ({}));
   clean();
   if (!r.ok || !data.access_token) throw new Error(data.error || 'Token exchange failed (' + r.status + ')');
