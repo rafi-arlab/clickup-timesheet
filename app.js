@@ -1,12 +1,12 @@
 const API = 'https://api.clickup.com/api/v2';
 
-// Fill these in after a Workspace admin registers the OAuth app
-// (ClickUp → Settings → Apps → Create new app), with the redirect URL set to
-// this page's URL. Leave clientId empty and the login button stays hidden, with
-// an on-screen note saying login is not configured yet.
+// Currently pointed at the app registered in a personal test Workspace.
+// For the company rollout an admin must register a second app whose redirect URL
+// is the production page URL, then swap clientId here and the two Worker secrets.
+// Blank clientId hides the login button and says so on screen.
 const OAUTH = {
-  clientId: '',
-  exchangeUrl: ''            // Cloudflare Worker that swaps code → token (see worker/)
+  clientId: 'XFU7D3EJGKD0NT7TUVNPKE8RVM6PBEME',
+  exchangeUrl: 'https://clickup-oauth.rafiharake4.workers.dev'   // see worker/
 };
 const oauthReady = () => !!(OAUTH.clientId && OAUTH.exchangeUrl);
 const redirectUri = () => location.origin + location.pathname;
